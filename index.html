@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suzuki Parts Catalog</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">⚙</span>
+        <div>
+          <div class="logo-title">SUZUKI PARTS</div>
+          <div class="logo-sub">Katalog Sparepart Internal</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-outline" onclick="openModal('add')">+ Tambah Part</button>
+        <button class="btn btn-ghost" onclick="exportExcel()">⬇ Export Excel</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- SEARCH BAR -->
+    <section class="search-section">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Cari part number atau nama barang... (contoh: dekrup, 22100-52S00)"
+          oninput="handleSearch()"
+          autocomplete="off"
+        />
+        <button class="clear-btn" id="clearBtn" onclick="clearSearch()" style="display:none">✕</button>
+      </div>
+      <div class="search-hint" id="searchHint">Menampilkan <strong id="countDisplay">0</strong> part</div>
+    </section>
+
+    <!-- TABLE -->
+    <section class="table-section">
+      <div class="table-wrap">
+        <table id="partsTable">
+          <thead>
+            <tr>
+              <th style="width:50px">#</th>
+              <th onclick="sortTable('partNumber')" class="sortable">
+                Part Number <span class="sort-icon" id="sort-partNumber">↕</span>
+              </th>
+              <th onclick="sortTable('description')" class="sortable">
+                Deskripsi / Nama Barang <span class="sort-icon" id="sort-description">↕</span>
+              </th>
+              <th onclick="sortTable('category')" class="sortable">
+                Kategori <span class="sort-icon" id="sort-category">↕</span>
+              </th>
+              <th style="width:130px">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Rows rendered by JS -->
+          </tbody>
+        </table>
+
+        <div id="emptyState" class="empty-state" style="display:none">
+          <div class="empty-icon">🔩</div>
+          <div class="empty-title">Tidak ada part ditemukan</div>
+          <div class="empty-sub">Coba kata kunci lain, atau tambah part baru</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL ADD / EDIT -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModalOverlay(event)">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">Tambah Part Baru</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Part Number <span class="required">*</span></label>
+          <input id="inputPartNumber" type="text" placeholder="contoh: 22100-52S00-000" />
+        </div>
+        <div class="form-group">
+          <label>Deskripsi / Nama Barang <span class="required">*</span></label>
+          <input id="inputDescription" type="text" placeholder="contoh: Dekrup Futura 2019" />
+        </div>
+        <div class="form-group">
+          <label>Kategori</label>
+          <input id="inputCategory" type="text" placeholder="contoh: Mesin, Body, Elektrikal..." list="categoryList" />
+          <datalist id="categoryList"></datalist>
+        </div>
+        <div class="form-group">
+          <label>Catatan (opsional)</label>
+          <textarea id="inputNotes" placeholder="Catatan tambahan..."></textarea>
+        </div>
+        <div class="modal-error" id="modalError" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
+        <button class="btn btn-primary" onclick="savePart()">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DELETE CONFIRM -->
+  <div class="modal-overlay" id="deleteOverlay" onclick="closeDeleteOverlay(event)">
+    <div class="modal modal-sm" id="deleteModal">
+      <div class="modal-header">
+        <h2>Hapus Part?</h2>
+        <button class="modal-close" onclick="closeDelete()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>Yakin ingin menghapus part ini?</p>
+        <div class="delete-info" id="deleteInfo"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeDelete()">Batal</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
