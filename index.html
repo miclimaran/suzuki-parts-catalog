@@ -9,77 +9,132 @@
 </head>
 <body>
 
-  <!-- HEADER -->
-  <header>
-    <div class="header-inner">
-      <div class="logo">
-        <span class="logo-icon">⚙</span>
+  <!-- ==================== LOGIN SCREEN ==================== -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="logo-icon spin">⚙</span>
         <div>
-          <div class="logo-title">SUZUKI PARTS</div>
-          <div class="logo-sub">Katalog Sparepart Internal</div>
+          <div class="login-title">SUZUKI PARTS</div>
+          <div class="login-sub">Katalog Sparepart Internal</div>
         </div>
       </div>
-      <div class="header-actions">
-        <button class="btn btn-outline" onclick="openModal('add')">+ Tambah Part</button>
-        <button class="btn btn-ghost" onclick="exportExcel()">⬇ Export Excel</button>
+
+      <div class="login-body">
+        <div class="form-group">
+          <label>Email</label>
+          <input id="loginEmail" type="email" placeholder="nama@email.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <div class="pw-wrap">
+            <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+            <button class="pw-toggle" type="button" onclick="togglePw()" id="pwToggleBtn">👁</button>
+          </div>
+        </div>
+        <div class="login-error" id="loginError" style="display:none"></div>
+        <button class="btn btn-primary btn-full" id="loginBtn" onclick="doLogin()">Masuk</button>
       </div>
+
+      <div class="login-footer">Akses hanya untuk tim internal Suzuki</div>
     </div>
-  </header>
+  </div>
 
-  <!-- MAIN -->
-  <main>
+  <!-- ==================== MAIN APP ==================== -->
+  <div id="appShell" style="display:none">
 
-    <!-- SEARCH BAR -->
-    <section class="search-section">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input
-          id="searchInput"
-          type="text"
-          placeholder="Cari part number atau nama barang... (contoh: dekrup, 22100-52S00)"
-          oninput="handleSearch()"
-          autocomplete="off"
-        />
-        <button class="clear-btn" id="clearBtn" onclick="clearSearch()" style="display:none">✕</button>
-      </div>
-      <div class="search-hint" id="searchHint">Menampilkan <strong id="countDisplay">0</strong> part</div>
-    </section>
-
-    <!-- TABLE -->
-    <section class="table-section">
-      <div class="table-wrap">
-        <table id="partsTable">
-          <thead>
-            <tr>
-              <th style="width:50px">#</th>
-              <th onclick="sortTable('partNumber')" class="sortable">
-                Part Number <span class="sort-icon" id="sort-partNumber">↕</span>
-              </th>
-              <th onclick="sortTable('description')" class="sortable">
-                Deskripsi / Nama Barang <span class="sort-icon" id="sort-description">↕</span>
-              </th>
-              <th onclick="sortTable('category')" class="sortable">
-                Kategori <span class="sort-icon" id="sort-category">↕</span>
-              </th>
-              <th style="width:130px">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="tableBody">
-            <!-- Rows rendered by JS -->
-          </tbody>
-        </table>
-
-        <div id="emptyState" class="empty-state" style="display:none">
-          <div class="empty-icon">🔩</div>
-          <div class="empty-title">Tidak ada part ditemukan</div>
-          <div class="empty-sub">Coba kata kunci lain, atau tambah part baru</div>
+    <!-- HEADER -->
+    <header>
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon spin">⚙</span>
+          <div>
+            <div class="logo-title">SUZUKI PARTS</div>
+            <div class="logo-sub">Katalog Sparepart Internal</div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <!-- Admin only buttons -->
+          <button class="btn btn-outline admin-only" onclick="openModal('add')">+ Tambah Part</button>
+          <button class="btn btn-outline admin-only" onclick="openImportModal()">⬆ Import</button>
+          <button class="btn btn-ghost" onclick="exportExcel()">⬇ Export</button>
+          <!-- User info -->
+          <div class="user-info">
+            <div class="user-avatar" id="userAvatar">?</div>
+            <div class="user-dropdown" id="userDropdown">
+              <div class="user-email" id="userEmailDisplay"></div>
+              <div class="user-role-badge" id="userRoleBadge"></div>
+              <hr class="dropdown-divider" />
+              <button class="dropdown-item admin-only" onclick="openUserMgmt()">👥 Kelola Akun</button>
+              <button class="dropdown-item" onclick="doLogout()">🚪 Keluar</button>
+            </div>
+          </div>
         </div>
       </div>
-    </section>
+    </header>
 
-  </main>
+    <!-- MAIN -->
+    <main>
 
-  <!-- MODAL ADD / EDIT -->
+      <!-- SEARCH BAR -->
+      <section class="search-section">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Cari part number atau nama barang... (contoh: dekrup, 22100-52S00)"
+            oninput="handleSearch()"
+            autocomplete="off"
+          />
+          <button class="clear-btn" id="clearBtn" onclick="clearSearch()" style="display:none">✕</button>
+        </div>
+        <div class="search-hint" id="searchHint">Menampilkan <strong id="countDisplay">0</strong> part</div>
+      </section>
+
+      <!-- TABLE -->
+      <section class="table-section">
+        <div class="table-wrap">
+          <table id="partsTable">
+            <thead>
+              <tr>
+                <th style="width:50px">#</th>
+                <th onclick="sortTable('part_number')" class="sortable">
+                  Part Number <span class="sort-icon" id="sort-part_number">↕</span>
+                </th>
+                <th onclick="sortTable('description')" class="sortable">
+                  Deskripsi / Nama Barang <span class="sort-icon" id="sort-description">↕</span>
+                </th>
+                <th onclick="sortTable('category')" class="sortable">
+                  Kategori <span class="sort-icon" id="sort-category">↕</span>
+                </th>
+                <th class="admin-only" style="width:130px">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- Rows rendered by JS -->
+            </tbody>
+          </table>
+
+          <div id="emptyState" class="empty-state" style="display:none">
+            <div class="empty-icon">🔩</div>
+            <div class="empty-title">Tidak ada part ditemukan</div>
+            <div class="empty-sub">Coba kata kunci lain, atau tambah part baru</div>
+          </div>
+
+          <div id="loadingState" class="empty-state">
+            <div class="empty-icon">⏳</div>
+            <div class="empty-title">Memuat data...</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div><!-- end #appShell -->
+
+
+  <!-- ==================== MODAL ADD / EDIT ==================== -->
   <div class="modal-overlay" id="modalOverlay" onclick="closeModalOverlay(event)">
     <div class="modal" id="modal">
       <div class="modal-header">
@@ -108,12 +163,12 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeModal()">Batal</button>
-        <button class="btn btn-primary" onclick="savePart()">Simpan</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="savePart()">Simpan</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL DELETE CONFIRM -->
+  <!-- ==================== MODAL DELETE CONFIRM ==================== -->
   <div class="modal-overlay" id="deleteOverlay" onclick="closeDeleteOverlay(event)">
     <div class="modal modal-sm" id="deleteModal">
       <div class="modal-header">
@@ -126,7 +181,102 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-ghost" onclick="closeDelete()">Batal</button>
-        <button class="btn btn-danger" onclick="confirmDelete()">Hapus</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn" onclick="confirmDelete()">Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL IMPORT ==================== -->
+  <div class="modal-overlay" id="importOverlay" onclick="closeImportOverlay(event)">
+    <div class="modal" id="importModal">
+      <div class="modal-header">
+        <h2>Import Data</h2>
+        <button class="modal-close" onclick="closeImport()">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Tab -->
+        <div class="import-tabs">
+          <button class="import-tab active" id="tabExcel" onclick="switchImportTab('excel')">📄 File Excel / CSV</button>
+          <button class="import-tab" id="tabSheets" onclick="switchImportTab('sheets')">📊 Google Sheets</button>
+        </div>
+
+        <!-- Tab Excel -->
+        <div id="importPanelExcel">
+          <div class="import-info">
+            <strong>Format kolom yang diharapkan:</strong><br>
+            Kolom A: Part Number &nbsp;|&nbsp; Kolom B: Deskripsi &nbsp;|&nbsp; Kolom C: Kategori &nbsp;|&nbsp; Kolom D: Catatan
+          </div>
+          <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()"
+               ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
+            <div class="file-drop-icon">📁</div>
+            <div class="file-drop-text">Klik atau drag & drop file di sini</div>
+            <div class="file-drop-sub">.xlsx, .xls, .csv didukung</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFileSelect(event)" />
+          </div>
+          <div id="fileSelected" style="display:none" class="file-selected"></div>
+        </div>
+
+        <!-- Tab Google Sheets -->
+        <div id="importPanelSheets" style="display:none">
+          <div class="import-info">
+            <strong>Cara:</strong><br>
+            1. Buka Google Sheets Anda<br>
+            2. Klik <strong>File → Share → Publish to web</strong> → pilih <em>Comma-separated values (.csv)</em> → Publish<br>
+            3. Atau: <strong>File → Share → Anyone with link can view</strong><br>
+            4. Copy link dan paste di bawah ini
+          </div>
+          <div class="form-group">
+            <label>Link Google Sheets</label>
+            <input id="sheetsUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." />
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div id="importPreview" style="display:none">
+          <div class="preview-header">
+            <strong id="previewCount"></strong>
+            <label class="toggle-label">
+              <input type="checkbox" id="skipFirstRow" checked onchange="refreshPreview()"> Skip baris pertama (header)
+            </label>
+          </div>
+          <div class="preview-table-wrap">
+            <table class="preview-table" id="previewTable"></table>
+          </div>
+        </div>
+
+        <div class="modal-error" id="importError" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeImport()">Batal</button>
+        <button class="btn btn-outline" id="importLoadBtn" onclick="loadImportData()">Muat Data</button>
+        <button class="btn btn-primary" id="importSaveBtn" onclick="doImport()" style="display:none">Import Semua</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL KELOLA AKUN ==================== -->
+  <div class="modal-overlay" id="userMgmtOverlay" onclick="closeUserMgmtOverlay(event)">
+    <div class="modal modal-lg" id="userMgmtModal">
+      <div class="modal-header">
+        <h2>👥 Kelola Akun</h2>
+        <button class="modal-close" onclick="closeUserMgmt()">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="user-mgmt-info">
+          Untuk <strong>menambah akun baru</strong>, buka <a href="https://supabase.com/dashboard" target="_blank">Supabase Dashboard</a>
+          → Authentication → Users → Invite user. Role default adalah <em>viewer</em>.
+          Ubah role di bawah ini.
+        </div>
+
+        <div id="userListWrap">
+          <div class="empty-icon" style="font-size:24px;text-align:center">⏳</div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeUserMgmt()">Tutup</button>
       </div>
     </div>
   </div>
@@ -134,6 +284,10 @@
   <!-- TOAST -->
   <div class="toast" id="toast"></div>
 
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SheetJS untuk baca file Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
