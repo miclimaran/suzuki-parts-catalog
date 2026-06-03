@@ -395,6 +395,26 @@ async function savePart() {
     return;
   }
 
+  // Cek duplikat part number (hanya saat tambah baru, bukan edit)
+  if (!editingId) {
+    const duplicate = parts.find(p => p.part_number.toUpperCase() === partNumber);
+    if (duplicate) {
+      errorEl.innerHTML = `⚠ Part Number <strong>${partNumber}</strong> sudah ada di database.<br>
+        <small style="color:var(--gray-500)">Deskripsi: ${escHtml(duplicate.description)}</small>`;
+      errorEl.style.display = 'block';
+      return;
+    }
+  } else {
+    // Saat edit: cek duplikat dengan part lain (bukan dirinya sendiri)
+    const duplicate = parts.find(p => p.part_number.toUpperCase() === partNumber && p.id !== editingId);
+    if (duplicate) {
+      errorEl.innerHTML = `⚠ Part Number <strong>${partNumber}</strong> sudah dipakai oleh part lain.<br>
+        <small style="color:var(--gray-500)">Deskripsi: ${escHtml(duplicate.description)}</small>`;
+      errorEl.style.display = 'block';
+      return;
+    }
+  }
+
   saveBtn.textContent = 'Menyimpan...';
   saveBtn.disabled    = true;
 
@@ -517,6 +537,8 @@ function openImportModal() {
   document.getElementById('fileSelected').style.display  = 'none';
   document.getElementById('fileInput').value             = '';
   document.getElementById('sheetsUrl').value             = '';
+  const warnEl = document.getElementById('importWarning');
+  if (warnEl) warnEl.style.display = 'none';
   switchImportTab('excel');
   document.getElementById('importOverlay').classList.add('open');
 }
@@ -536,9 +558,11 @@ function switchImportTab(tab) {
   document.getElementById('importPanelExcel').style.display  = tab === 'excel'  ? 'block' : 'none';
   document.getElementById('importPanelSheets').style.display = tab === 'sheets' ? 'block' : 'none';
   importRawData = [];
-  document.getElementById('importPreview').style.display = 'none';
-  document.getElementById('importSaveBtn').style.display = 'none';
-  document.getElementById('importError').style.display   = 'none';
+  document.getElementById('importPreview').style.display  = 'none';
+  document.getElementById('importSaveBtn').style.display  = 'none';
+  document.getElementById('importError').style.display    = 'none';
+  const warnEl = document.getElementById('importWarning');
+  if (warnEl) warnEl.style.display = 'none';
 }
 
 // Drag & Drop
@@ -674,27 +698,66 @@ function refreshPreview() {
     return;
   }
 
-  document.getElementById('previewCount').textContent = `Preview: ${rows.length} baris akan diimport`;
+  // Cek duplikat: vs database & vs sesama baris di file
+  const existingNums = new Set(parts.map(p => p.part_number.toUpperCase()));
+  const seenInFile   = new Set();
+  const rowsWithFlag = rows.map(r => {
+    const pn  = String(r[0] || '').trim().toUpperCase();
+    let dupType = null;
+    if (existingNums.has(pn))  dupType = 'db';       // sudah ada di database
+    else if (seenInFile.has(pn)) dupType = 'file';   // duplikat dalam file itu sendiri
+    if (pn) seenInFile.add(pn);
+    return { r, pn, dupType };
+  });
 
-  const preview = rows.slice(0, 5);
+  const dupDbCount   = rowsWithFlag.filter(x => x.dupType === 'db').length;
+  const dupFileCount = rowsWithFlag.filter(x => x.dupType === 'file').length;
+  const totalDup     = dupDbCount + dupFileCount;
+
+  let countText = `Preview: ${rows.length} baris akan diimport`;
+  if (totalDup > 0) {
+    countText += ` &nbsp;⚠ <span style="color:#f59e0b;font-weight:600">${totalDup} duplikat ditemukan</span> (akan di-<em>update</em>, bukan ditambah baru)`;
+  }
+  document.getElementById('previewCount').innerHTML = countText;
+
+  const preview = rowsWithFlag.slice(0, 5);
   const table   = document.getElementById('previewTable');
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Part Number</th><th>Deskripsi</th><th>Catatan</th>
+        <th>Part Number</th><th>Deskripsi</th><th>Catatan</th><th>Status</th>
       </tr>
     </thead>
     <tbody>
-      ${preview.map(r => `
-        <tr>
-          <td>${escHtml(r[0] || '')}</td>
-          <td>${escHtml(r[1] || '')}</td>
-          <td>${escHtml(r[2] || '')}</td>
-        </tr>
-      `).join('')}
-      ${rows.length > 5 ? `<tr><td colspan="3" style="text-align:center;color:var(--gray-500);font-size:12px">... dan ${rows.length - 5} baris lainnya</td></tr>` : ''}
+      ${preview.map(({ r, pn, dupType }) => {
+        let statusBadge = '<span style="color:#22c55e;font-size:11px">✅ Baru</span>';
+        let rowStyle    = '';
+        if (dupType === 'db') {
+          statusBadge = '<span style="color:#f59e0b;font-size:11px;font-weight:600">⚠ Sudah ada di DB (akan diupdate)</span>';
+          rowStyle    = 'background:rgba(245,158,11,0.08);';
+        } else if (dupType === 'file') {
+          statusBadge = '<span style="color:#ef4444;font-size:11px;font-weight:600">⛔ Duplikat dalam file</span>';
+          rowStyle    = 'background:rgba(239,68,68,0.08);';
+        }
+        return `
+          <tr style="${rowStyle}">
+            <td><strong>${escHtml(pn)}</strong></td>
+            <td>${escHtml(r[1] || '')}</td>
+            <td>${escHtml(r[2] || '')}</td>
+            <td>${statusBadge}</td>
+          </tr>`;
+      }).join('')}
+      ${rows.length > 5 ? `<tr><td colspan="4" style="text-align:center;color:var(--gray-500);font-size:12px">... dan ${rows.length - 5} baris lainnya</td></tr>` : ''}
     </tbody>
   `;
+
+  // Tampilkan warning ringkasan jika ada duplikat
+  if (dupDbCount > 0 || dupFileCount > 0) {
+    const msgs = [];
+    if (dupDbCount   > 0) msgs.push(`${dupDbCount} part sudah ada di database dan akan di-<strong>update</strong>`);
+    if (dupFileCount > 0) msgs.push(`${dupFileCount} part duplikat dalam file (hanya baris pertama yang dipakai)`);
+    showImportWarning('⚠ ' + msgs.join(' • '));
+  }
 
   document.getElementById('importPreview').style.display = 'block';
   document.getElementById('importSaveBtn').style.display = 'inline-flex';
@@ -736,6 +799,13 @@ function showImportError(msg) {
   const el = document.getElementById('importError');
   el.textContent    = msg;
   el.style.display  = 'block';
+}
+
+function showImportWarning(html) {
+  const el = document.getElementById('importWarning');
+  if (!el) return;
+  el.innerHTML     = html;
+  el.style.display = 'block';
 }
 
 // ============================================================

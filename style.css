@@ -614,6 +614,15 @@ tbody td {
   font-weight: 600;
   white-space: pre-line;
 }
+.modal-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-top: 10px;
+}
 
 /* ===========================
    IMPORT MODAL
