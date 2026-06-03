@@ -105,8 +105,8 @@
                 <th onclick="sortTable('description')" class="sortable">
                   Deskripsi / Nama Barang <span class="sort-icon" id="sort-description">↕</span>
                 </th>
-                <th onclick="sortTable('category')" class="sortable">
-                  Kategori <span class="sort-icon" id="sort-category">↕</span>
+                <th onclick="sortTable('notes')" class="sortable">
+                  Catatan <span class="sort-icon" id="sort-notes">↕</span>
                 </th>
                 <th class="admin-only" style="width:130px">Aksi</th>
               </tr>
@@ -149,11 +149,6 @@
         <div class="form-group">
           <label>Deskripsi / Nama Barang <span class="required">*</span></label>
           <input id="inputDescription" type="text" placeholder="contoh: Dekrup Futura 2019" />
-        </div>
-        <div class="form-group">
-          <label>Kategori</label>
-          <input id="inputCategory" type="text" placeholder="contoh: Mesin, Body, Elektrikal..." list="categoryList" />
-          <datalist id="categoryList"></datalist>
         </div>
         <div class="form-group">
           <label>Catatan (opsional)</label>
@@ -205,7 +200,7 @@
         <div id="importPanelExcel">
           <div class="import-info">
             <strong>Format kolom yang diharapkan:</strong><br>
-            Kolom A: Part Number &nbsp;|&nbsp; Kolom B: Deskripsi &nbsp;|&nbsp; Kolom C: Kategori &nbsp;|&nbsp; Kolom D: Catatan
+            Kolom A: Part Number &nbsp;|&nbsp; Kolom B: Deskripsi &nbsp;|&nbsp; Kolom C: Catatan
           </div>
           <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()"
                ondragover="handleDragOver(event)" ondrop="handleDrop(event)">

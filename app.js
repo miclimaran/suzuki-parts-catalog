@@ -246,7 +246,6 @@ function getFiltered() {
     result = result.filter(p =>
       (p.part_number  || '').toLowerCase().includes(q) ||
       (p.description  || '').toLowerCase().includes(q) ||
-      (p.category     || '').toLowerCase().includes(q) ||
       (p.notes        || '').toLowerCase().includes(q)
     );
   }
@@ -319,12 +318,9 @@ function render() {
       </td>
       <td>
         <div class="description-text">${highlight(p.description, searchQuery)}</div>
-        ${p.notes ? `<div class="notes-text">${highlight(p.notes, searchQuery)}</div>` : ''}
       </td>
       <td>
-        ${p.category
-          ? `<span class="category-badge">${highlight(p.category, searchQuery)}</span>`
-          : '<span style="color:var(--gray-300);font-size:12px">—</span>'}
+        <div class="notes-text">${highlight(p.notes || '', searchQuery)}</div>
       </td>
       ${isAdmin ? `
       <td>
@@ -337,11 +333,9 @@ function render() {
   `).join('');
 }
 
-// ---- Category datalist ----
+// ---- Category datalist (removed) ----
 function buildCategoryList() {
-  const cats = [...new Set(parts.map(p => p.category).filter(Boolean))].sort();
-  const list = document.getElementById('categoryList');
-  if (list) list.innerHTML = cats.map(c => `<option value="${escHtml(c)}">`).join('');
+  // kategori dihapus
 }
 
 // ============================================================
@@ -360,13 +354,11 @@ function openModal(mode, id = null) {
     document.getElementById('modalTitle').textContent        = 'Edit Part';
     document.getElementById('inputPartNumber').value         = part.part_number;
     document.getElementById('inputDescription').value        = part.description;
-    document.getElementById('inputCategory').value           = part.category || '';
     document.getElementById('inputNotes').value              = part.notes    || '';
   } else {
     document.getElementById('modalTitle').textContent        = 'Tambah Part Baru';
     document.getElementById('inputPartNumber').value         = '';
     document.getElementById('inputDescription').value        = '';
-    document.getElementById('inputCategory').value           = '';
     document.getElementById('inputNotes').value              = '';
   }
 
@@ -386,7 +378,6 @@ function closeModalOverlay(e) {
 async function savePart() {
   const partNumber  = document.getElementById('inputPartNumber').value.trim().toUpperCase();
   const description = document.getElementById('inputDescription').value.trim();
-  const category    = document.getElementById('inputCategory').value.trim();
   const notes       = document.getElementById('inputNotes').value.trim();
   const errorEl     = document.getElementById('modalError');
   const saveBtn     = document.getElementById('saveBtn');
@@ -409,12 +400,12 @@ async function savePart() {
 
   try {
     if (editingId) {
-      const updated = await updatePart(editingId, { part_number: partNumber, description, category, notes });
+      const updated = await updatePart(editingId, { part_number: partNumber, description, notes });
       const idx = parts.findIndex(p => p.id === editingId);
       if (idx !== -1) parts[idx] = updated;
       showToast('✅ Part berhasil diupdate!');
     } else {
-      const added = await insertPart({ part_number: partNumber, description, category, notes });
+      const added = await insertPart({ part_number: partNumber, description, notes });
       parts.unshift(added);
       showToast('✅ Part berhasil ditambahkan!');
     }
@@ -488,12 +479,11 @@ function exportExcel() {
   }
 
   const BOM    = '﻿';
-  const header = ['No', 'Part Number', 'Deskripsi / Nama Barang', 'Kategori', 'Catatan'];
+  const header = ['No', 'Part Number', 'Deskripsi / Nama Barang', 'Catatan'];
   const rows   = filtered.map((p, i) => [
     i + 1,
     p.part_number,
     p.description,
-    p.category || '',
     p.notes    || ''
   ]);
 
@@ -691,7 +681,7 @@ function refreshPreview() {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Part Number</th><th>Deskripsi</th><th>Kategori</th><th>Catatan</th>
+        <th>Part Number</th><th>Deskripsi</th><th>Catatan</th>
       </tr>
     </thead>
     <tbody>
@@ -700,10 +690,9 @@ function refreshPreview() {
           <td>${escHtml(r[0] || '')}</td>
           <td>${escHtml(r[1] || '')}</td>
           <td>${escHtml(r[2] || '')}</td>
-          <td>${escHtml(r[3] || '')}</td>
         </tr>
       `).join('')}
-      ${rows.length > 5 ? `<tr><td colspan="4" style="text-align:center;color:var(--gray-500);font-size:12px">... dan ${rows.length - 5} baris lainnya</td></tr>` : ''}
+      ${rows.length > 5 ? `<tr><td colspan="3" style="text-align:center;color:var(--gray-500);font-size:12px">... dan ${rows.length - 5} baris lainnya</td></tr>` : ''}
     </tbody>
   `;
 
@@ -722,8 +711,7 @@ async function doImport() {
   const toInsert = rows.map(r => ({
     part_number: String(r[0] || '').trim().toUpperCase(),
     description: String(r[1] || '').trim(),
-    category:    String(r[2] || '').trim(),
-    notes:       String(r[3] || '').trim(),
+    notes:       String(r[2] || '').trim(),
   })).filter(p => p.part_number && p.description);
 
   // Upsert: update jika part_number sudah ada, insert jika belum
