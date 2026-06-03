@@ -346,6 +346,9 @@ function openModal(mode, id = null) {
   if (currentRole !== 'admin') return;
   editingId = null;
   document.getElementById('modalError').style.display = 'none';
+  const mw = document.getElementById('modalWarning');
+  if (mw) mw.style.display = 'none';
+  document.getElementById('saveBtn').dataset.confirmed = '';
 
   if (mode === 'edit' && id) {
     const part = parts.find(p => p.id === id);
@@ -369,6 +372,9 @@ function openModal(mode, id = null) {
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
   editingId = null;
+  document.getElementById('saveBtn').dataset.confirmed = '';
+  const mw = document.getElementById('modalWarning');
+  if (mw) mw.style.display = 'none';
 }
 
 function closeModalOverlay(e) {
@@ -395,25 +401,41 @@ async function savePart() {
     return;
   }
 
-  // Cek duplikat part number (hanya saat tambah baru, bukan edit)
-  if (!editingId) {
-    const duplicate = parts.find(p => p.part_number.toUpperCase() === partNumber);
-    if (duplicate) {
-      errorEl.innerHTML = `⚠ Part Number <strong>${partNumber}</strong> sudah ada di database.<br>
-        <small style="color:var(--gray-500)">Deskripsi: ${escHtml(duplicate.description)}</small>`;
-      errorEl.style.display = 'block';
-      return;
-    }
-  } else {
-    // Saat edit: cek duplikat dengan part lain (bukan dirinya sendiri)
-    const duplicate = parts.find(p => p.part_number.toUpperCase() === partNumber && p.id !== editingId);
-    if (duplicate) {
-      errorEl.innerHTML = `⚠ Part Number <strong>${partNumber}</strong> sudah dipakai oleh part lain.<br>
-        <small style="color:var(--gray-500)">Deskripsi: ${escHtml(duplicate.description)}</small>`;
-      errorEl.style.display = 'block';
-      return;
-    }
+  // --- Cek duplikat deskripsi sama persis (part number + deskripsi identik) ---
+  const exactMatch = parts.find(p =>
+    p.part_number.toUpperCase() === partNumber &&
+    p.description.trim().toLowerCase() === description.toLowerCase() &&
+    p.id !== editingId
+  );
+  if (exactMatch) {
+    errorEl.innerHTML = `⛔ Data ini sudah ada persis di database dan tidak bisa disimpan.<br>
+      <small style="color:var(--gray-500)">Part: ${escHtml(exactMatch.part_number)} — ${escHtml(exactMatch.description)}</small>`;
+    errorEl.style.display = 'block';
+    return;
   }
+
+  // --- Cek part number sama, deskripsi beda → warning tapi boleh lanjut ---
+  const sameNumberParts = parts.filter(p =>
+    p.part_number.toUpperCase() === partNumber && p.id !== editingId
+  );
+  const warnEl = document.getElementById('modalWarning');
+  if (sameNumberParts.length > 0 && !saveBtn.dataset.confirmed) {
+    // Tampilkan warning, minta konfirmasi klik sekali lagi
+    const list = sameNumberParts.map(p => `• ${escHtml(p.description)}`).join('<br>');
+    if (warnEl) {
+      warnEl.innerHTML = `⚠ Part Number <strong>${partNumber}</strong> sudah dipakai oleh ${sameNumberParts.length} data lain:<br>
+        <div style="margin:6px 0 4px 8px;font-weight:normal">${list}</div>
+        Pastikan deskripsi berbeda. Klik <strong>Simpan</strong> lagi untuk tetap menyimpan.`;
+      warnEl.style.display = 'block';
+    }
+    saveBtn.dataset.confirmed = '1';
+    saveBtn.textContent = 'Simpan';
+    saveBtn.disabled    = false;
+    return;
+  }
+  // Reset konfirmasi & warning
+  saveBtn.dataset.confirmed = '';
+  if (warnEl) warnEl.style.display = 'none';
 
   saveBtn.textContent = 'Menyimpan...';
   saveBtn.disabled    = true;
@@ -699,25 +721,51 @@ function refreshPreview() {
   }
 
   // Cek duplikat: vs database & vs sesama baris di file
+  // Aturan:
+  //   'exact'  → part_number + deskripsi sama persis (DB)       → DIBLOKIR (dilewati saat import)
+  //   'samepn' → part_number sama, deskripsi beda (DB)          → WARNING, tetap diimport
+  //   'infile' → part_number sama dalam file, deskripsi beda    → WARNING, tetap diimport
+  //   'inexact'→ part_number + deskripsi sama dalam file        → DIBLOKIR (dilewati saat import)
+
+  // Buat map: "PARTNUMBER||deskripsi_lowercase" → true untuk cek exact DB
+  const existingExact = new Set(
+    parts.map(p => `${p.part_number.toUpperCase()}||${p.description.trim().toLowerCase()}`)
+  );
   const existingNums = new Set(parts.map(p => p.part_number.toUpperCase()));
-  const seenInFile   = new Set();
+
+  const seenInFile      = new Set(); // part_number saja
+  const seenExactInFile = new Set(); // part_number||deskripsi
+
   const rowsWithFlag = rows.map(r => {
-    const pn  = String(r[0] || '').trim().toUpperCase();
-    let dupType = null;
-    if (existingNums.has(pn))  dupType = 'db';       // sudah ada di database
-    else if (seenInFile.has(pn)) dupType = 'file';   // duplikat dalam file itu sendiri
-    if (pn) seenInFile.add(pn);
-    return { r, pn, dupType };
+    const pn   = String(r[0] || '').trim().toUpperCase();
+    const desc = String(r[1] || '').trim();
+    const key  = `${pn}||${desc.toLowerCase()}`;
+    let status = 'new';
+
+    if (existingExact.has(key)) {
+      status = 'exact_db';           // sama persis di DB → BLOKIR
+    } else if (seenExactInFile.has(key)) {
+      status = 'exact_file';         // sama persis di file → BLOKIR
+    } else if (existingNums.has(pn)) {
+      status = 'samepn_db';          // part number sama di DB, deskripsi beda → WARNING
+    } else if (seenInFile.has(pn)) {
+      status = 'samepn_file';        // part number sama di file, deskripsi beda → WARNING
+    }
+
+    if (pn) { seenInFile.add(pn); seenExactInFile.add(key); }
+    return { r, pn, desc, status };
   });
 
-  const dupDbCount   = rowsWithFlag.filter(x => x.dupType === 'db').length;
-  const dupFileCount = rowsWithFlag.filter(x => x.dupType === 'file').length;
-  const totalDup     = dupDbCount + dupFileCount;
+  const cntExactDb   = rowsWithFlag.filter(x => x.status === 'exact_db').length;
+  const cntExactFile = rowsWithFlag.filter(x => x.status === 'exact_file').length;
+  const cntWarnDb    = rowsWithFlag.filter(x => x.status === 'samepn_db').length;
+  const cntWarnFile  = rowsWithFlag.filter(x => x.status === 'samepn_file').length;
+  const cntBlocked   = cntExactDb + cntExactFile;
+  const cntWill      = rowsWithFlag.length - cntBlocked;
 
-  let countText = `Preview: ${rows.length} baris akan diimport`;
-  if (totalDup > 0) {
-    countText += ` &nbsp;⚠ <span style="color:#f59e0b;font-weight:600">${totalDup} duplikat ditemukan</span> (akan di-<em>update</em>, bukan ditambah baru)`;
-  }
+  let countText = `Preview: <strong>${cntWill}</strong> baris akan diimport`;
+  if (cntBlocked > 0) countText += ` &nbsp;⛔ <span style="color:#ef4444;font-weight:600">${cntBlocked} dilewati (identik)</span>`;
+  if (cntWarnDb + cntWarnFile > 0) countText += ` &nbsp;⚠ <span style="color:#f59e0b;font-weight:600">${cntWarnDb + cntWarnFile} peringatan (no. sama, desc beda)</span>`;
   document.getElementById('previewCount').innerHTML = countText;
 
   const preview = rowsWithFlag.slice(0, 5);
@@ -729,58 +777,85 @@ function refreshPreview() {
       </tr>
     </thead>
     <tbody>
-      ${preview.map(({ r, pn, dupType }) => {
-        let statusBadge = '<span style="color:#22c55e;font-size:11px">✅ Baru</span>';
-        let rowStyle    = '';
-        if (dupType === 'db') {
-          statusBadge = '<span style="color:#f59e0b;font-size:11px;font-weight:600">⚠ Sudah ada di DB (akan diupdate)</span>';
-          rowStyle    = 'background:rgba(245,158,11,0.08);';
-        } else if (dupType === 'file') {
-          statusBadge = '<span style="color:#ef4444;font-size:11px;font-weight:600">⛔ Duplikat dalam file</span>';
-          rowStyle    = 'background:rgba(239,68,68,0.08);';
+      ${preview.map(({ r, pn, status }) => {
+        let badge = '<span style="color:#22c55e;font-size:11px;font-weight:600">✅ Baru</span>';
+        let rowStyle = '';
+        if (status === 'exact_db') {
+          badge    = '<span style="color:#ef4444;font-size:11px;font-weight:600">⛔ Identik di DB — dilewati</span>';
+          rowStyle = 'background:rgba(239,68,68,0.07);opacity:0.7;';
+        } else if (status === 'exact_file') {
+          badge    = '<span style="color:#ef4444;font-size:11px;font-weight:600">⛔ Identik dalam file — dilewati</span>';
+          rowStyle = 'background:rgba(239,68,68,0.07);opacity:0.7;';
+        } else if (status === 'samepn_db') {
+          badge    = '<span style="color:#f59e0b;font-size:11px;font-weight:600">⚠ No. sama di DB, desc beda — tetap diimport</span>';
+          rowStyle = 'background:rgba(245,158,11,0.07);';
+        } else if (status === 'samepn_file') {
+          badge    = '<span style="color:#f59e0b;font-size:11px;font-weight:600">⚠ No. sama dalam file, desc beda — tetap diimport</span>';
+          rowStyle = 'background:rgba(245,158,11,0.07);';
         }
         return `
           <tr style="${rowStyle}">
             <td><strong>${escHtml(pn)}</strong></td>
             <td>${escHtml(r[1] || '')}</td>
             <td>${escHtml(r[2] || '')}</td>
-            <td>${statusBadge}</td>
+            <td>${badge}</td>
           </tr>`;
       }).join('')}
       ${rows.length > 5 ? `<tr><td colspan="4" style="text-align:center;color:var(--gray-500);font-size:12px">... dan ${rows.length - 5} baris lainnya</td></tr>` : ''}
     </tbody>
   `;
 
-  // Tampilkan warning ringkasan jika ada duplikat
-  if (dupDbCount > 0 || dupFileCount > 0) {
-    const msgs = [];
-    if (dupDbCount   > 0) msgs.push(`${dupDbCount} part sudah ada di database dan akan di-<strong>update</strong>`);
-    if (dupFileCount > 0) msgs.push(`${dupFileCount} part duplikat dalam file (hanya baris pertama yang dipakai)`);
-    showImportWarning('⚠ ' + msgs.join(' • '));
-  }
+  // Warning ringkasan
+  const warnMsgs = [];
+  if (cntExactDb   > 0) warnMsgs.push(`⛔ ${cntExactDb} baris identik persis dengan data di database — <strong>akan dilewati</strong>`);
+  if (cntExactFile > 0) warnMsgs.push(`⛔ ${cntExactFile} baris identik persis dalam file — <strong>akan dilewati</strong>`);
+  if (cntWarnDb    > 0) warnMsgs.push(`⚠ ${cntWarnDb} baris punya nomor part sama dengan di database tapi deskripsi beda — <strong>tetap diimport sebagai data baru</strong>`);
+  if (cntWarnFile  > 0) warnMsgs.push(`⚠ ${cntWarnFile} baris punya nomor part sama dalam file tapi deskripsi beda — <strong>tetap diimport sebagai data baru</strong>`);
+  if (warnMsgs.length > 0) showImportWarning(warnMsgs.join('<br>'));
 
   document.getElementById('importPreview').style.display = 'block';
-  document.getElementById('importSaveBtn').style.display = 'inline-flex';
+  document.getElementById('importSaveBtn').style.display = cntWill > 0 ? 'inline-flex' : 'none';
 }
 
 async function doImport() {
-  const rows  = getImportRows();
+  const rows = getImportRows();
   if (rows.length === 0) return;
 
   const btn = document.getElementById('importSaveBtn');
   btn.textContent = 'Mengimport...';
   btn.disabled    = true;
 
-  const toInsert = rows.map(r => ({
-    part_number: String(r[0] || '').trim().toUpperCase(),
-    description: String(r[1] || '').trim(),
-    notes:       String(r[2] || '').trim(),
-  })).filter(p => p.part_number && p.description);
+  // Saring: skip yang identik persis (part_number + deskripsi sama) dengan DB atau sesama file
+  const existingExact   = new Set(
+    parts.map(p => `${p.part_number.toUpperCase()}||${p.description.trim().toLowerCase()}`)
+  );
+  const seenExactInFile = new Set();
 
-  // Upsert: update jika part_number sudah ada, insert jika belum
-  const { data, error } = await _sb.from('parts')
-    .upsert(toInsert, { onConflict: 'part_number', ignoreDuplicates: false })
-    .select();
+  const toInsert = [];
+  let skipped = 0;
+
+  for (const r of rows) {
+    const pn   = String(r[0] || '').trim().toUpperCase();
+    const desc = String(r[1] || '').trim();
+    const key  = `${pn}||${desc.toLowerCase()}`;
+    if (!pn || !desc) continue;
+    if (existingExact.has(key) || seenExactInFile.has(key)) {
+      skipped++;
+      continue;
+    }
+    seenExactInFile.add(key);
+    toInsert.push({ part_number: pn, description: desc, notes: String(r[2] || '').trim() });
+  }
+
+  if (toInsert.length === 0) {
+    showImportError(`Semua baris identik persis dengan data yang sudah ada. Tidak ada yang diimport.`);
+    btn.textContent = 'Import Semua';
+    btn.disabled    = false;
+    return;
+  }
+
+  // Insert biasa (bukan upsert) — part number boleh sama asal deskripsi beda
+  const { error } = await _sb.from('parts').insert(toInsert).select();
 
   btn.textContent = 'Import Semua';
   btn.disabled    = false;
@@ -790,7 +865,9 @@ async function doImport() {
     return;
   }
 
-  showToast(`✅ ${toInsert.length} part berhasil diimport!`);
+  let msg = `✅ ${toInsert.length} part berhasil diimport!`;
+  if (skipped > 0) msg += ` (${skipped} dilewati karena identik)`;
+  showToast(msg);
   closeImport();
   await fetchParts();
 }
