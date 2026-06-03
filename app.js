@@ -242,12 +242,16 @@ function getFiltered() {
   let result = [...parts];
 
   if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    result = result.filter(p =>
-      (p.part_number  || '').toLowerCase().includes(q) ||
-      (p.description  || '').toLowerCase().includes(q) ||
-      (p.notes        || '').toLowerCase().includes(q)
-    );
+    // Pecah query jadi kata-kata, semua kata harus cocok di gabungan semua kolom
+    const words = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    result = result.filter(p => {
+      const haystack = [
+        p.part_number  || '',
+        p.description  || '',
+        p.notes        || ''
+      ].join(' ').toLowerCase();
+      return words.every(w => haystack.includes(w));
+    });
   }
 
   if (sortKey) {
