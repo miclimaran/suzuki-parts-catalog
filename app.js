@@ -188,7 +188,7 @@ async function fetchParts() {
 
   parts = data || [];
   buildCategoryList();
-  render();
+  render(true);
 }
 
 async function insertPart(partData) {
@@ -288,11 +288,47 @@ function escHtml(str) {
 
 function showLoading(show) {
   const ls = document.getElementById('loadingState');
-  const ts = document.getElementById('table-section');
   if (ls) ls.style.display = show ? 'block' : 'none';
+  if (show) {
+    const tbl   = document.getElementById('partsTable');
+    const empty = document.getElementById('emptyState');
+    if (tbl)   tbl.style.display   = 'none';
+    if (empty) empty.style.display = 'none';
+  }
 }
 
-function render() {
+// ---- Animasi angka naik (count-up) ----
+function animateCount(el, target) {
+  if (!el) return;
+  const start    = parseInt(el.textContent.replace(/\D/g, ''), 10) || 0;
+  if (start === target) { el.textContent = target.toLocaleString('id-ID'); return; }
+  const duration = 600;
+  const t0       = performance.now();
+  function step(now) {
+    const p   = Math.min((now - t0) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+    const val = Math.round(start + (target - start) * eased);
+    el.textContent = val.toLocaleString('id-ID');
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function updateStats(filteredCount) {
+  const total  = parts.length;
+  const unique = new Set(parts.map(p => (p.part_number || '').toUpperCase())).size;
+  const withNotes = parts.filter(p => (p.notes || '').trim() !== '').length;
+
+  animateCount(document.getElementById('statTotal'),  total);
+  animateCount(document.getElementById('statShown'),  filteredCount);
+  animateCount(document.getElementById('statUnique'), unique);
+  animateCount(document.getElementById('statNotes'),  withNotes);
+
+  const foot = document.getElementById('statShownFoot');
+  if (foot) foot.textContent = searchQuery ? `Cocok dengan "${searchQuery}"` : 'Menampilkan semua data';
+}
+
+function render(animate = false) {
   const filtered = getFiltered();
   const tbody    = document.getElementById('tableBody');
   const empty    = document.getElementById('emptyState');
@@ -301,11 +337,24 @@ function render() {
 
   if (loading) loading.style.display = 'none';
   count.textContent = filtered.length;
+  updateStats(filtered.length);
 
   if (filtered.length === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
     document.getElementById('partsTable').style.display = 'none';
+    // Pesan kosong yang lebih informatif
+    const t = document.querySelector('#emptyState .empty-title');
+    const s = document.querySelector('#emptyState .empty-sub');
+    if (searchQuery) {
+      if (t) t.textContent = 'Tidak ada hasil';
+      if (s) s.innerHTML  = `Tidak ditemukan part yang cocok dengan "<strong>${escHtml(searchQuery)}</strong>". Coba kata kunci lain.`;
+    } else {
+      if (t) t.textContent = 'Belum ada part';
+      if (s) s.textContent = currentRole === 'admin'
+        ? 'Klik "+ Tambah Part" atau "⬆ Import" untuk mulai mengisi katalog.'
+        : 'Katalog masih kosong.';
+    }
     return;
   }
 
@@ -313,6 +362,9 @@ function render() {
   document.getElementById('partsTable').style.display = 'table';
 
   const isAdmin = currentRole === 'admin';
+
+  // Stagger animasi hanya saat data baru dimuat (bukan tiap ketik pencarian)
+  tbody.className = animate ? 'stagger' : '';
 
   tbody.innerHTML = filtered.map((p, i) => `
     <tr>

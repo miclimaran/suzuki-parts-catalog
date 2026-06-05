@@ -76,6 +76,42 @@
     <!-- MAIN -->
     <main>
 
+      <!-- STATS DASHBOARD -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Total Part</span>
+            <span class="stat-icon">📦</span>
+          </div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-foot">Seluruh data di katalog</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Sedang Tampil</span>
+            <span class="stat-icon green">🔎</span>
+          </div>
+          <div class="stat-value" id="statShown">0</div>
+          <div class="stat-foot" id="statShownFoot">Hasil pencarian saat ini</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Nomor Part Unik</span>
+            <span class="stat-icon indigo">🔩</span>
+          </div>
+          <div class="stat-value" id="statUnique">0</div>
+          <div class="stat-foot">Part number berbeda</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-top">
+            <span class="stat-label">Punya Catatan</span>
+            <span class="stat-icon amber">📝</span>
+          </div>
+          <div class="stat-value" id="statNotes">0</div>
+          <div class="stat-foot">Part dengan catatan terisi</div>
+        </div>
+      </section>
+
       <!-- SEARCH BAR -->
       <section class="search-section">
         <div class="search-wrap">
@@ -122,9 +158,12 @@
             <div class="empty-sub">Coba kata kunci lain, atau tambah part baru</div>
           </div>
 
-          <div id="loadingState" class="empty-state">
-            <div class="empty-icon">⏳</div>
-            <div class="empty-title">Memuat data...</div>
+          <div id="loadingState" class="skeleton-wrap">
+            <div class="skeleton-row"><span class="skeleton sk-num"></span><span class="skeleton sk-pn"></span><span class="skeleton sk-desc"></span><span class="skeleton sk-note"></span></div>
+            <div class="skeleton-row"><span class="skeleton sk-num"></span><span class="skeleton sk-pn"></span><span class="skeleton sk-desc"></span><span class="skeleton sk-note"></span></div>
+            <div class="skeleton-row"><span class="skeleton sk-num"></span><span class="skeleton sk-pn"></span><span class="skeleton sk-desc"></span><span class="skeleton sk-note"></span></div>
+            <div class="skeleton-row"><span class="skeleton sk-num"></span><span class="skeleton sk-pn"></span><span class="skeleton sk-desc"></span><span class="skeleton sk-note"></span></div>
+            <div class="skeleton-row"><span class="skeleton sk-num"></span><span class="skeleton sk-pn"></span><span class="skeleton sk-desc"></span><span class="skeleton sk-note"></span></div>
           </div>
         </div>
       </section>
