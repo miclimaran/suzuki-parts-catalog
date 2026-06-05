@@ -405,31 +405,33 @@ async function savePart() {
     return;
   }
 
-  // --- Cek duplikat deskripsi sama persis (part number + deskripsi identik) ---
+  // --- Cek identik persis: part number + deskripsi + catatan semua sama ---
   const exactMatch = parts.find(p =>
     p.part_number.toUpperCase() === partNumber &&
-    p.description.trim().toLowerCase() === description.toLowerCase() &&
+    (p.description || '').trim().toLowerCase() === description.toLowerCase() &&
+    (p.notes || '').trim().toLowerCase() === notes.toLowerCase() &&
     p.id !== editingId
   );
   if (exactMatch) {
-    errorEl.innerHTML = `⛔ Data ini sudah ada persis di database dan tidak bisa disimpan.<br>
-      <small style="color:var(--gray-500)">Part: ${escHtml(exactMatch.part_number)} — ${escHtml(exactMatch.description)}</small>`;
+    errorEl.innerHTML = `⛔ Data ini sudah ada persis di database (Part Number, Deskripsi, dan Catatan sama semua).<br>
+      <small style="color:var(--gray-500)">${escHtml(exactMatch.part_number)} — ${escHtml(exactMatch.description)} — ${escHtml(exactMatch.notes || '(tanpa catatan)')}</small>`;
     errorEl.style.display = 'block';
     return;
   }
 
-  // --- Cek part number sama, deskripsi beda → warning tapi boleh lanjut ---
+  // --- Part number sama → warning saja, tetap boleh disimpan ---
   const sameNumberParts = parts.filter(p =>
     p.part_number.toUpperCase() === partNumber && p.id !== editingId
   );
   const warnEl = document.getElementById('modalWarning');
   if (sameNumberParts.length > 0 && !saveBtn.dataset.confirmed) {
-    // Tampilkan warning, minta konfirmasi klik sekali lagi
-    const list = sameNumberParts.map(p => `• ${escHtml(p.description)}`).join('<br>');
+    const list = sameNumberParts.map(p =>
+      `• ${escHtml(p.description)}${p.notes ? ' <span style="color:var(--gray-500)">— ' + escHtml(p.notes) + '</span>' : ''}`
+    ).join('<br>');
     if (warnEl) {
       warnEl.innerHTML = `⚠ Part Number <strong>${partNumber}</strong> sudah dipakai oleh ${sameNumberParts.length} data lain:<br>
-        <div style="margin:6px 0 4px 8px;font-weight:normal">${list}</div>
-        Pastikan deskripsi berbeda. Klik <strong>Simpan</strong> lagi untuk tetap menyimpan.`;
+        <div style="margin:6px 0 4px 8px;font-weight:normal;font-size:12px">${list}</div>
+        Klik <strong>Simpan</strong> lagi untuk tetap menyimpan.`;
       warnEl.style.display = 'block';
     }
     saveBtn.dataset.confirmed = '1';
@@ -726,34 +728,35 @@ function refreshPreview() {
 
   // Cek duplikat: vs database & vs sesama baris di file
   // Aturan:
-  //   'exact'  → part_number + deskripsi sama persis (DB)       → DIBLOKIR (dilewati saat import)
-  //   'samepn' → part_number sama, deskripsi beda (DB)          → WARNING, tetap diimport
-  //   'infile' → part_number sama dalam file, deskripsi beda    → WARNING, tetap diimport
-  //   'inexact'→ part_number + deskripsi sama dalam file        → DIBLOKIR (dilewati saat import)
+  //   'exact_db'    → part_number + deskripsi + catatan SEMUA sama persis di DB → DIBLOKIR
+  //   'exact_file'  → part_number + deskripsi + catatan SEMUA sama dalam file   → DIBLOKIR
+  //   'samepn_db'   → part_number sama di DB, deskripsi/catatan beda            → WARNING saja
+  //   'samepn_file' → part_number sama dalam file, deskripsi/catatan beda       → WARNING saja
 
-  // Buat map: "PARTNUMBER||deskripsi_lowercase" → true untuk cek exact DB
+  // Key exact: part_number || deskripsi || catatan
   const existingExact = new Set(
-    parts.map(p => `${p.part_number.toUpperCase()}||${p.description.trim().toLowerCase()}`)
+    parts.map(p => `${p.part_number.toUpperCase()}||${(p.description||'').trim().toLowerCase()}||${(p.notes||'').trim().toLowerCase()}`)
   );
   const existingNums = new Set(parts.map(p => p.part_number.toUpperCase()));
 
   const seenInFile      = new Set(); // part_number saja
-  const seenExactInFile = new Set(); // part_number||deskripsi
+  const seenExactInFile = new Set(); // key 3 kolom
 
   const rowsWithFlag = rows.map(r => {
     const pn   = String(r[0] || '').trim().toUpperCase();
     const desc = String(r[1] || '').trim();
-    const key  = `${pn}||${desc.toLowerCase()}`;
+    const note = String(r[2] || '').trim();
+    const key  = `${pn}||${desc.toLowerCase()}||${note.toLowerCase()}`;
     let status = 'new';
 
     if (existingExact.has(key)) {
-      status = 'exact_db';           // sama persis di DB → BLOKIR
+      status = 'exact_db';
     } else if (seenExactInFile.has(key)) {
-      status = 'exact_file';         // sama persis di file → BLOKIR
+      status = 'exact_file';
     } else if (existingNums.has(pn)) {
-      status = 'samepn_db';          // part number sama di DB, deskripsi beda → WARNING
+      status = 'samepn_db';
     } else if (seenInFile.has(pn)) {
-      status = 'samepn_file';        // part number sama di file, deskripsi beda → WARNING
+      status = 'samepn_file';
     }
 
     if (pn) { seenInFile.add(pn); seenExactInFile.add(key); }
@@ -829,9 +832,9 @@ async function doImport() {
   btn.textContent = 'Mengimport...';
   btn.disabled    = true;
 
-  // Saring: skip yang identik persis (part_number + deskripsi sama) dengan DB atau sesama file
+  // Saring: skip hanya yang KETIGA KOLOM identik persis (part_number + deskripsi + catatan)
   const existingExact   = new Set(
-    parts.map(p => `${p.part_number.toUpperCase()}||${p.description.trim().toLowerCase()}`)
+    parts.map(p => `${p.part_number.toUpperCase()}||${(p.description||'').trim().toLowerCase()}||${(p.notes||'').trim().toLowerCase()}`)
   );
   const seenExactInFile = new Set();
 
@@ -841,14 +844,15 @@ async function doImport() {
   for (const r of rows) {
     const pn   = String(r[0] || '').trim().toUpperCase();
     const desc = String(r[1] || '').trim();
-    const key  = `${pn}||${desc.toLowerCase()}`;
+    const note = String(r[2] || '').trim();
+    const key  = `${pn}||${desc.toLowerCase()}||${note.toLowerCase()}`;
     if (!pn || !desc) continue;
     if (existingExact.has(key) || seenExactInFile.has(key)) {
       skipped++;
       continue;
     }
     seenExactInFile.add(key);
-    toInsert.push({ part_number: pn, description: desc, notes: String(r[2] || '').trim() });
+    toInsert.push({ part_number: pn, description: desc, notes: note });
   }
 
   if (toInsert.length === 0) {
